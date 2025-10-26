@@ -94,8 +94,8 @@ Output ONLY the JSON, no other text."""
             {"role": "user", "content": user_prompt}
         ]
         
-        # Get evaluation from Gemini
-        response = self.llm.chat(messages, temperature=0.2, max_tokens=2000)
+        # Get evaluation from Gemini (increased max_tokens for complete JSON)
+        response = self.llm.chat(messages, temperature=0.2, max_tokens=4000)
         
         # Parse JSON response
         try:

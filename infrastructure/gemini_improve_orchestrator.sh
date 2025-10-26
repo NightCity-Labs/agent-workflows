@@ -212,7 +212,8 @@ pdflatex -interaction=nonstopmode "main_${OUTPUT_VERSION}.tex" >> "$LOG_DIR/comp
 
 if [ -f "main_${OUTPUT_VERSION}.pdf" ]; then
     PDF_SIZE=$(ls -lh "main_${OUTPUT_VERSION}.pdf" | awk '{print $5}')
-    PDF_PAGES=$(pdfinfo "main_${OUTPUT_VERSION}.pdf" 2>/dev/null | grep Pages | awk '{print $2}' || echo "?")
+    # Extract page count from compile log (more reliable than pdfinfo)
+    PDF_PAGES=$(grep -o "Output written.*([0-9]* pages" "$LOG_DIR/compile.log" 2>/dev/null | grep -o "[0-9]* pages" | awk '{print $1}' || echo "?")
     log "DONE" "PDF generated: ${PDF_SIZE}, ${PDF_PAGES} pages"
 else
     log "ERROR" "PDF generation failed"
