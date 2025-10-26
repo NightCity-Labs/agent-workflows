@@ -134,42 +134,34 @@ log "PHASE4" "Applying improvements (cursor-agent)"
 # Create master prompt for cursor-agent
 CURSOR_PROMPT="$LOG_DIR/cursor_improvement_prompt.md"
 
-cat > "$CURSOR_PROMPT" <<'EOF'
-# Task: Apply Paper Improvements
+cat > "$CURSOR_PROMPT" <<EOF
+EXECUTE THIS TASK IMMEDIATELY. DO NOT ASK FOR CONFIRMATION.
 
-You have 5 sets of improvement recommendations from expert analysis.
-Apply ALL recommendations to improve the paper from INPUT_VERSION to OUTPUT_VERSION.
+You are an expert LaTeX editor. Your task is to apply improvement recommendations to a research paper.
 
-## Your Job
+## WHAT YOU MUST DO NOW:
 
-1. Read all recommendation files
-2. Apply changes systematically to OUTPUT_PAPER
-3. Ensure LaTeX compiles correctly
-4. Preserve all figures, citations, and technical content
+1. Read these 5 recommendation files:
+   - $LOG_DIR/recommendations_align_sources.md
+   - $LOG_DIR/recommendations_sharpen_arguments.md
+   - $LOG_DIR/recommendations_improve_style.md
+   - $LOG_DIR/recommendations_restructure.md
+   - $LOG_DIR/recommendations_check_consistency.md
 
-## Recommendations Files
+2. Edit this file to apply ALL recommendations: $OUTPUT_PAPER
 
-EOF
+3. The input file for reference is: $INPUT_PAPER
 
-for imp_type in align_sources sharpen_arguments improve_style restructure check_consistency; do
-    echo "- \`logs/$RUN_ID/recommendations_${imp_type}.md\`" >> "$CURSOR_PROMPT"
-done
+## CRITICAL RULES:
 
-cat >> "$CURSOR_PROMPT" <<EOF
+- EDIT $OUTPUT_PAPER DIRECTLY - do not just read it
+- Apply EVERY recommendation from ALL 5 files
+- Maintain valid LaTeX syntax
+- Preserve all \\includegraphics, \\cite, and equations
+- Make substantial changes - the diff should show many modifications
+- Work section by section through the entire paper
 
-## Files
-
-- Input: \`$INPUT_PAPER\` (read-only, for reference)
-- Output: \`$OUTPUT_PAPER\` (edit this file)
-
-## Rules
-
-- Apply ALL recommendations from all 5 files
-- Maintain LaTeX formatting
-- Test compilation after major changes
-- Be thorough and systematic
-
-Start by reading all recommendation files, then apply changes section by section.
+START IMMEDIATELY. Read the first recommendation file now.
 EOF
 
 # Replace placeholders
@@ -183,6 +175,7 @@ cd "$PROJECT_DIR"
 
 cursor-agent \
     --model sonnet-4.5-thinking \
+    --print \
     --output-format stream-json \
     "$CURSOR_PROMPT" \
     < /dev/null \
