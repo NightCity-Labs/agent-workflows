@@ -2,7 +2,9 @@
 # Gemini-based Paper Improvement Orchestrator
 # Uses Gemini API for analysis/evaluation and cursor-agent for implementation
 
-set -e
+set -e  # Exit on error
+set -o pipefail  # Catch errors in pipes
+# Uncomment for debugging: set -x
 
 # ============================================================================
 # CONFIGURATION
@@ -179,7 +181,10 @@ cursor-agent \
     --output-format stream-json \
     "$CURSOR_PROMPT" \
     < /dev/null \
-    > "$LOG_DIR/cursor_agent.jsonl" 2>&1
+    > "$LOG_DIR/cursor_agent.jsonl" 2>&1 || {
+    log "ERROR" "cursor-agent failed with exit code $?"
+    exit 1
+}
 
 log "INFO" "cursor-agent completed"
 
@@ -233,7 +238,10 @@ python3 "$GEMINI_DIR/gemini_paper_evaluator.py" \
     --version "$OUTPUT_VERSION" \
     --run-id "$RUN_ID" \
     --output "$LOG_DIR/evaluation.json" \
-    2>&1 | tee -a "$ORCH_LOG"
+    2>&1 | tee -a "$ORCH_LOG" || {
+    log "ERROR" "Evaluation failed with exit code $?"
+    log "WARN" "Continuing without evaluation scores"
+}
 
 log "INFO" "Evaluation complete"
 
