@@ -190,6 +190,20 @@ cursor-agent \
 
 log "INFO" "cursor-agent completed"
 
+# Check if changes were made
+CHANGES=$(diff "$INPUT_PAPER" "$OUTPUT_PAPER" | wc -l)
+log "INFO" "Changes made: $CHANGES lines different"
+
+if [ "$CHANGES" -eq 0 ]; then
+    log "ERROR" "cursor-agent made NO changes! v2 and v3 are identical"
+    log "ERROR" "Check $LOG_DIR/cursor_agent.jsonl for details"
+    exit 1
+fi
+
+# Show summary of changes
+log "CHANGES" "Showing first 30 lines of diff:"
+diff "$INPUT_PAPER" "$OUTPUT_PAPER" | head -30 | tee -a "$ORCH_LOG"
+
 # ============================================================================
 # PHASE 5: COMPILE PDF
 # ============================================================================
@@ -231,11 +245,25 @@ log "INFO" "Evaluation complete"
 
 # Display evaluation summary
 if [ -f "$LOG_DIR/evaluation.json" ]; then
-    QUALITY=$(jq -r '.scores.overall_quality' "$LOG_DIR/evaluation.json" 2>/dev/null || echo "?")
-    ACCEPT_PROB=$(jq -r '.scores.acceptance_probability' "$LOG_DIR/evaluation.json" 2>/dev/null || echo "?")
-    VENUE=$(jq -r '.estimated_venue' "$LOG_DIR/evaluation.json" 2>/dev/null || echo "?")
-    
-    log "EVAL" "Quality: $QUALITY/10, Accept Prob: $ACCEPT_PROB, Venue: $VENUE"
+    # Check if evaluation failed
+    ERROR=$(jq -r '.error // empty' "$LOG_DIR/evaluation.json" 2>/dev/null)
+    if [ -n "$ERROR" ]; then
+        log "ERROR" "Evaluation failed: $ERROR"
+        QUALITY="FAILED"
+        ACCEPT_PROB="FAILED"
+        VENUE="FAILED"
+    else
+        QUALITY=$(jq -r '.scores.overall_quality' "$LOG_DIR/evaluation.json" 2>/dev/null || echo "?")
+        ACCEPT_PROB=$(jq -r '.scores.acceptance_probability' "$LOG_DIR/evaluation.json" 2>/dev/null || echo "?")
+        VENUE=$(jq -r '.estimated_venue' "$LOG_DIR/evaluation.json" 2>/dev/null || echo "?")
+        
+        log "EVAL" "Quality: $QUALITY/10, Accept Prob: $ACCEPT_PROB, Venue: $VENUE"
+    fi
+else
+    log "ERROR" "Evaluation file not found"
+    QUALITY="MISSING"
+    ACCEPT_PROB="MISSING"
+    VENUE="MISSING"
 fi
 
 # ============================================================================
@@ -254,13 +282,30 @@ Logs: logs/$RUN_ID/
 Branch: $BRANCH_NAME" 2>&1 | tee -a "$ORCH_LOG"
 
 log "BACKUP" "Running GCS backup"
-"$PROJECT_DIR/backup_agent_runs.sh" 2>&1 | tee -a "$ORCH_LOG" || log "WARN" "Backup failed (non-critical)"
+if [ -f "$PROJECT_DIR/backup_agent_runs.sh" ]; then
+    "$PROJECT_DIR/backup_agent_runs.sh" 2>&1 | tail -5 | tee -a "$ORCH_LOG" || log "WARN" "Backup failed (non-critical)"
+else
+    log "WARN" "Backup script not found, skipping"
+fi
 
 # ============================================================================
 # COMPLETION
 # ============================================================================
 
 log "DONE" "Paper improvement complete"
+
+# Print summary to stdout (not just log file)
+echo ""
+echo "============================================"
+echo "WORKFLOW SUMMARY"
+echo "============================================"
+echo "Changes: $CHANGES lines modified"
+echo "PDF: ${PDF_SIZE}, ${PDF_PAGES} pages"
+echo "Quality: ${QUALITY}/10"
+echo "Accept Prob: ${ACCEPT_PROB}"
+echo "Venue: ${VENUE}"
+echo "============================================"
+echo ""
 
 echo ""
 echo "============================================"
