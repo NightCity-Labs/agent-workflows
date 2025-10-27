@@ -8,9 +8,10 @@ import sys
 import os
 import json
 import argparse
+import base64
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 # Add ncl_agents to path
 sys.path.insert(0, '/Users/cstein/code/ncl_agents/src')
@@ -28,6 +29,7 @@ class PaperEvaluator:
     def evaluate(
         self,
         paper_tex: str,
+        paper_pdf_path: str,
         version: str,
         run_id: str
     ) -> Dict[str, Any]:
@@ -36,6 +38,7 @@ class PaperEvaluator:
         
         Args:
             paper_tex: Full LaTeX paper content
+            paper_pdf_path: Path to the rendered PDF file
             version: Version identifier (e.g., "v2", "v3")
             run_id: Unique run identifier
         
@@ -101,10 +104,34 @@ Be honest and calibrated to real NeurIPS standards. Most papers are posters (6-7
 
 Output ONLY the JSON, no other text."""
 
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ]
+        # Prepare message with PDF attachment
+        # For Vertex AI/Gemini, we need to encode the PDF as base64 and include it
+        try:
+            with open(paper_pdf_path, 'rb') as f:
+                pdf_data = base64.b64encode(f.read()).decode('utf-8')
+            
+            # Build message with PDF attachment
+            # LiteLLM/Vertex AI format for file attachments
+            user_content = [
+                {"type": "text", "text": user_prompt},
+                {
+                    "type": "file",
+                    "file": {
+                        "file_id": f"data:application/pdf;base64,{pdf_data}",
+                    }
+                }
+            ]
+            
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content}
+            ]
+        except Exception as e:
+            print(f"Warning: Could not attach PDF ({e}), falling back to LaTeX-only evaluation", file=sys.stderr)
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ]
         
         # Get evaluation from Gemini (increased max_tokens for complete JSON)
         response = self.llm.chat(messages, temperature=0.2, max_tokens=4000)
@@ -144,6 +171,7 @@ def main():
     """CLI for paper evaluation."""
     parser = argparse.ArgumentParser(description="Evaluate paper quality with Gemini")
     parser.add_argument("paper_file", help="LaTeX paper file")
+    parser.add_argument("--pdf", help="PDF file (if not provided, will try to infer from paper_file)")
     parser.add_argument("--version", required=True, help="Version identifier (e.g., v2, v3)")
     parser.add_argument("--run-id", required=True, help="Unique run identifier")
     parser.add_argument("--output", "-o", required=True, help="Output JSON file")
@@ -154,11 +182,22 @@ def main():
     # Read paper
     paper_tex = Path(args.paper_file).read_text()
     
-    print(f"🔍 Evaluating paper (version {args.version})...", file=sys.stderr)
+    # Infer PDF path if not provided
+    if args.pdf:
+        pdf_path = args.pdf
+    else:
+        # Try to infer: replace .tex with .pdf
+        pdf_path = str(Path(args.paper_file).with_suffix('.pdf'))
+    
+    if not Path(pdf_path).exists():
+        print(f"Error: PDF file not found at {pdf_path}", file=sys.stderr)
+        sys.exit(1)
+    
+    print(f"🔍 Evaluating paper (version {args.version}) with PDF attachment...", file=sys.stderr)
     
     # Evaluate
     evaluator = PaperEvaluator(model=args.model)
-    evaluation = evaluator.evaluate(paper_tex, args.version, args.run_id)
+    evaluation = evaluator.evaluate(paper_tex, pdf_path, args.version, args.run_id)
     
     # Write output
     output_path = Path(args.output)
