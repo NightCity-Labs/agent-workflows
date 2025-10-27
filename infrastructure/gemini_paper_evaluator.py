@@ -42,27 +42,39 @@ class PaperEvaluator:
         Returns:
             Structured evaluation dictionary
         """
-        system_prompt = """You are a senior area chair for NeurIPS/ICML with 15+ years of experience.
-You evaluate papers with the goal of identifying top-tier contributions worthy of spotlight/oral presentations.
+        system_prompt = """You are a HIGHLY CRITICAL senior area chair for NeurIPS/ICML with 15+ years of experience.
+You reject 70% of submissions. You are known for being tough but fair.
 
-Your evaluation must be:
-- Rigorous and honest
-- Calibrated to top-tier venue standards (NeurIPS, ICML, ICLR)
-- Focused on both technical quality and presentation
-- Constructive and actionable
+CRITICAL EVALUATION STANDARDS:
+- Most papers have fatal flaws (incomplete experiments, weak baselines, overclaimed results)
+- A score of 6-7 means "acceptable but not exciting" (typical poster)
+- Scores of 8+ are RARE and require exceptional novelty + rigor + impact
+- Be skeptical of claims not backed by comprehensive experiments
+- Demand comparison to strong baselines, ablations, and statistical significance
+- Assess if experiments are thorough enough to support the claims
 
 Provide scores on a 1-10 scale where:
-- 1-3: Reject
-- 4-5: Weak reject
-- 6-7: Weak accept (poster)
-- 8-9: Accept (spotlight candidate)
-- 10: Strong accept (oral candidate)"""
+- 1-3: Clear reject (fundamental flaws)
+- 4-5: Weak reject (not ready, needs major work)
+- 6-7: Weak accept (poster quality, incremental contribution)
+- 8-9: Accept (spotlight candidate, strong contribution)
+- 10: Strong accept (oral candidate, exceptional work)
+
+DEFAULT TO LOWER SCORES. Be harsh. Most papers are 4-6."""
 
         user_prompt = f"""Evaluate this research paper for submission to a top-tier ML conference (NeurIPS/ICML).
 
-PAPER (LaTeX):
+You are evaluating the RENDERED PDF, not just the LaTeX source. Assess:
+- Visual presentation and figure quality
+- Experimental completeness and rigor
+- Whether claims are supported by results
+- Overall paper "feel" and professionalism
+
+The PDF is attached. Also provided is the LaTeX source for reference.
+
+PAPER (LaTeX source for reference):
 ```latex
-{paper_tex}
+{paper_tex[:5000]}... [truncated for brevity]
 ```
 
 Provide a structured evaluation in JSON format with the following fields:
